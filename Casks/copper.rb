@@ -17,8 +17,15 @@ cask "copper" do
   # Copper. Builds are ad-hoc signed, not notarized, so the app's own updater
   # cannot swap the bundle in place; declaring auto_updates would make
   # `brew upgrade --cask copper` a no-op unless the user passed --greedy.
-  # No `livecheck` either: the feed is internal-only and the release workflow
-  # rewrites this file on every release, so there is nothing for brew to poll.
+  # No livecheck polling either: the feed is internal-only and the release
+  # workflow rewrites this file on every release, so there is nothing for brew
+  # to poll. The explicit skip stops `brew audit --strict` from guessing a
+  # GitHub-tag livecheck off the homepage (which would report Copper's static
+  # VERSION file, 1.0, as "latest").
+  livecheck do
+    skip "versions come from the internal release workflow, not the upstream repo"
+  end
+
   depends_on macos: :sonoma
   depends_on arch: :arm64
 

@@ -29,7 +29,8 @@ test('renders the immutable feed URL and core stanzas', () => {
   assert.match(cask, /xattr", args: \["-cr"/)
   assert.match(cask, /zap trash:/)
   // The stanzas are intentionally absent (the comments explain why).
-  assert.doesNotMatch(cask, /^\s*(auto_updates|livecheck)\b/m)
+  assert.doesNotMatch(cask, /^\s*auto_updates\b/m)
+  assert.match(cask, /livecheck do\n\s+skip /)
   assert.ok(cask.endsWith('end\n'))
 })
 
