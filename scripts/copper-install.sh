@@ -131,6 +131,7 @@ running_copper_path() {
 	# The executable path of a running Copper, if any. Matching on the full
 	# bundle path (not just the process name) is what keeps a sandboxed install
 	# (COPPER_INSTALL_DIR elsewhere) from quitting the real /Applications copy.
+	# shellcheck disable=SC2009  # pgrep cannot return the executable path; the path IS the check
 	ps -axo comm= 2>/dev/null | grep -F "/Copper.app/Contents/MacOS/Copper" | head -n 1 || true
 }
 
