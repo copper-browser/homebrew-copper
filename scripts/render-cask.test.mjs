@@ -16,12 +16,14 @@ test('renders the immutable feed URL and core stanzas', () => {
   assert.match(cask, /^cask "copper" do$/m)
   assert.match(cask, /version "1\.0\.20260924\.3"/)
   assert.match(cask, new RegExp(`sha256 "${'a'.repeat(64)}"`))
-  assert.ok(cask.includes(`url "${archiveUrl(input)}"`))
-  assert.ok(
-    cask.includes(
-      'https://forca.apps.exowatt.com/releases/copper/1.0.20260924.3-g4ef72add55fe/downloads/copper-1.0.20260924.3-macos-arm64.zip'
-    )
+  // The url stanza interpolates #{version} (so brew audit sees a versioned
+  // URL); after Ruby interpolation it equals the immutable archive URL.
+  const urlStanza = cask.match(/^\s*url "([^"]+)"/m)?.[1]
+  assert.equal(
+    urlStanza,
+    'https://forca.apps.exowatt.com/releases/copper/#{version}-g4ef72add55fe/downloads/copper-#{version}-macos-arm64.zip'
   )
+  assert.equal(urlStanza.replaceAll('#{version}', input.version), archiveUrl(input))
   assert.match(cask, /depends_on macos: :sonoma/)
   assert.match(cask, /app "Copper\.app"/)
   assert.match(cask, /xattr", args: \["-cr"/)
@@ -43,6 +45,7 @@ test('rejects malformed inputs', () => {
   assert.throws(() => renderCopperCask({ ...input, version: '1.0.2026092.3' }), /invalid version/)
   assert.throws(() => renderCopperCask({ ...input, sha256: 'A'.repeat(64) }), /invalid sha256/)
   assert.throws(() => renderCopperCask({ ...input, releaseId: '../x' }), /invalid release-id/)
+  assert.throws(() => renderCopperCask({ ...input, releaseId: '9.9.20260101.1-gabc' }), /release-id must be/)
   assert.throws(() => renderCopperCask({ ...input, commit: 'abc' }), /invalid commit/)
 })
 

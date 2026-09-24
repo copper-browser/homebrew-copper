@@ -45,7 +45,14 @@ export function renderCopperCask({ version, sha256, releaseId, commit, cli }) {
   // sha256 fail for anyone who runs `brew install` between a feed publish and
   // the matching tap bump — and would make an older cask revision uninstallable.
   // The release-scoped archive never changes, so the cask stays self-consistent.
-  const url = archiveUrl({ version, releaseId })
+  // Rendered with `#{version}` interpolated (Ruby, evaluated by Homebrew) so
+  // `brew audit` sees a versioned URL; the commit suffix of the release id is
+  // not derivable from the version, so it stays literal.
+  if (!releaseId.startsWith(`${version}-g`)) {
+    throw new Error(`release-id must be <version>-g<commit12>, got ${releaseId}`)
+  }
+  const releaseSuffix = releaseId.slice(version.length)
+  const url = `${FEED_BASE_URL}/releases/copper/#{version}${releaseSuffix}/downloads/copper-#{version}-macos-arm64.zip`
 
   const binaryStanza = cli
     ? `
@@ -86,7 +93,10 @@ cask "copper" do
 ${binaryStanza}
   # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
   # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared — same reasoning as the forca and emu casks.
+  # cleared — same reasoning as the forca and emu casks. Homebrew ≥ 7.0.6 warns
+  # that \`postflight\` is deprecated in favour of \`postflight_steps\`; kept as
+  # \`postflight\` deliberately so the cask evaluates on the older Homebrew the
+  # team's Macs still run (forca and emu do the same). Flip it in the renderer.
   postflight do
     system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Copper.app"]
   end

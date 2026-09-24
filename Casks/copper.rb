@@ -8,7 +8,7 @@ cask "copper" do
   version "1.0.20260924.2"
   sha256 "35cdd582a42b1c9c28ec7e328bbf7035387a8b0bfde3045c7c284994d235f26b"
 
-  url "https://forca.apps.exowatt.com/releases/copper/1.0.20260924.2-gac59530a0cc3/downloads/copper-1.0.20260924.2-macos-arm64.zip"
+  url "https://forca.apps.exowatt.com/releases/copper/#{version}-gac59530a0cc3/downloads/copper-#{version}-macos-arm64.zip"
   name "Copper"
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
   homepage "https://github.com/collinrijock/Copper"
@@ -30,7 +30,10 @@ cask "copper" do
 
   # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
   # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared — same reasoning as the forca and emu casks.
+  # cleared — same reasoning as the forca and emu casks. Homebrew ≥ 7.0.6 warns
+  # that `postflight` is deprecated in favour of `postflight_steps`; kept as
+  # `postflight` deliberately so the cask evaluates on the older Homebrew the
+  # team's Macs still run (forca and emu do the same). Flip it in the renderer.
   postflight do
     system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Copper.app"]
   end
