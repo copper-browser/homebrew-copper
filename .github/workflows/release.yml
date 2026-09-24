@@ -1,0 +1,317 @@
+name: Release Copper
+
+# Builds collinrijock/Copper@<ref> and distributes it internally:
+#   1. build   (macos-15, GitHub-hosted): ./build.sh → stamp version → zip
+#   2. publish ([self-hosted, app-deploy]): upload to forca.apps.exowatt.com as
+#      product `copper`, render Casks/copper.rb, push it to this tap's main.
+#
+# Build/publish split, same as Exowatt-Labs/phi release-binaries.yml:
+# forca.apps.exowatt.com resolves only on the internal network, so the Xcode
+# build runs on a GitHub-hosted Mac and the upload runs on the platform's
+# in-network runner pool, with an artifact handed between them.
+#
+# Version scheme: <VERSION file>.<YYYYMMDD>.<run_number>, e.g. 1.0.20260924.3 —
+# monotonic for Homebrew even when `fork` is rebased; stamped into the bundle's
+# CFBundleShortVersionString so About / MCP serverInfo.version match the cask.
+#
+# Publish status defaults to `lkg` (a direct finalize that also refreshes the
+# flat /downloads aliases and the cask). Every run here is a human dispatch, so
+# the dispatch itself is the approval — unlike phi, which auto-publishes every
+# main push and therefore needs a separate candidate → LKG promotion gate.
+# Pick `candidate` to archive a build for testing without touching aliases or
+# the cask; its immutable URL is printed in the run summary.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "collinrijock/Copper git ref to build (branch, tag, or SHA)"
+        required: true
+        default: fork
+        type: string
+      status:
+        description: "lkg = publish + bump cask; candidate = archive only (no aliases, no cask bump)"
+        required: true
+        default: lkg
+        type: choice
+        options: [lkg, candidate]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-copper
+  cancel-in-progress: false
+
+env:
+  COPPER_REPO: collinrijock/Copper
+  FEED_BASE_URL: https://forca.apps.exowatt.com
+
+jobs:
+  build:
+    name: Build Copper.app (macos-15, arm64)
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      release_id: ${{ steps.meta.outputs.release_id }}
+      commit: ${{ steps.meta.outputs.commit }}
+      has_cli: ${{ steps.package.outputs.has_cli }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+      zip_name: ${{ steps.meta.outputs.zip_name }}
+      published_at: ${{ steps.meta.outputs.published_at }}
+    steps:
+      - name: Checkout tap (scripts)
+        uses: actions/checkout@v4
+        with:
+          path: tap
+          persist-credentials: false
+
+      - name: Checkout Copper source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.COPPER_REPO }}
+          ref: ${{ inputs.ref }}
+          path: copper
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Derive version and release id
+        id: meta
+        working-directory: copper
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          base="$(tr -d '[:space:]' < VERSION)"
+          day="$(date -u +%Y%m%d)"
+          version="${base}.${day}.${GITHUB_RUN_NUMBER}"
+          release_id="${version}-g${commit:0:12}"
+          {
+            echo "commit=${commit}"
+            echo "version=${version}"
+            echo "release_id=${release_id}"
+            echo "zip_name=copper-${version}-macos-arm64.zip"
+            echo "published_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building ${COPPER_REPO}@${commit} as Copper ${version} (release ${release_id})"
+
+      - name: Toolchain
+        # Why no xcode-select: Copper's own sync-fork.yml builds with the
+        # macos-15 image default, so that is the toolchain this mirrors.
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: ./build.sh (release, app step)
+        working-directory: copper
+        env:
+          # Why: keep Copper's own signing lookup from ever matching anything
+          # on a hosted runner; the bundle is ad-hoc signed by design.
+          SEARCH_SIGN_IDENTITY: ""
+        run: |
+          set -euo pipefail
+          ./build.sh release app
+          test -d build/Copper.app/Contents/MacOS
+
+      - name: Stamp version, re-sign ad hoc, zip
+        id: package
+        run: |
+          set -euo pipefail
+          out="${GITHUB_WORKSPACE}/upload"
+          has_cli="$(bash tap/scripts/package-app.sh copper/build/Copper.app "${{ steps.meta.outputs.version }}" "$out")"
+          echo "$has_cli" >> "$GITHUB_OUTPUT"
+          zip="$out/${{ steps.meta.outputs.zip_name }}"
+          sha="$(cut -d' ' -f1 < "$zip.sha256")"
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+          ls -la "$out"
+          cat "$zip.sha256"
+          plutil -p copper/build/Copper.app/Contents/Info.plist | grep -E 'CFBundle(ShortVersionString|Version|Identifier)'
+
+      - name: Stage installer and version manifest
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
+          COMMIT: ${{ steps.meta.outputs.commit }}
+          SHA256: ${{ steps.package.outputs.sha256 }}
+          ZIP_NAME: ${{ steps.meta.outputs.zip_name }}
+          HAS_CLI: ${{ steps.package.outputs.has_cli }}
+          PUBLISHED_AT: ${{ steps.meta.outputs.published_at }}
+          STATUS: ${{ inputs.status }}
+        run: |
+          set -euo pipefail
+          cp tap/scripts/copper-install.sh upload/copper-install.sh
+          node -e '
+            const fs = require("fs");
+            const e = process.env;
+            const manifest = {
+              schemaVersion: 1,
+              product: "copper",
+              version: e.VERSION,
+              releaseId: e.RELEASE_ID,
+              commit: e.COMMIT,
+              source: `https://github.com/collinrijock/Copper/commit/${e.COMMIT}`,
+              status: e.STATUS,
+              publishedAt: e.PUBLISHED_AT,
+              arch: "arm64",
+              zip: e.ZIP_NAME,
+              sha256: e.SHA256,
+              hasCli: e.HAS_CLI === "true",
+              archiveUrl: `${e.FEED_BASE_URL}/releases/copper/${e.RELEASE_ID}/downloads/${e.ZIP_NAME}`,
+              latestUrl: `${e.FEED_BASE_URL}/downloads/copper-latest-macos-arm64.zip`,
+              installer: "copper-install.sh",
+            };
+            fs.writeFileSync("upload/copper-version.json", JSON.stringify(manifest, null, 2) + "\n");
+          '
+          cat upload/copper-version.json
+          shasum -a 256 upload/*
+
+      - name: Hand off to the internal publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: copper-release
+          path: upload/*
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish → forca.apps.exowatt.com + bump cask
+    needs: build
+    # Why: forca.apps.exowatt.com is internal-only DNS; this label is the
+    # platform's in-network runner pool (org-level runners, any Exowatt-Labs repo).
+    runs-on: [self-hosted, app-deploy]
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      RELEASE_ID: ${{ needs.build.outputs.release_id }}
+      COMMIT: ${{ needs.build.outputs.commit }}
+      SHA256: ${{ needs.build.outputs.sha256 }}
+      ZIP_NAME: ${{ needs.build.outputs.zip_name }}
+      HAS_CLI: ${{ needs.build.outputs.has_cli }}
+      PUBLISHED_AT: ${{ needs.build.outputs.published_at }}
+      STATUS: ${{ inputs.status }}
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # Why: the cask bump is pushed with the workflow's own GITHUB_TOKEN
+          # (permissions: contents: write) — the workflow lives in the tap, so
+          # no deploy key is needed.
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: copper-release
+          path: upload
+
+      - name: Verify artifact checksum matches the build job
+        run: |
+          set -euo pipefail
+          actual="$(sha256sum "upload/${ZIP_NAME}" | cut -d' ' -f1)"
+          [ "$actual" = "$SHA256" ] || { echo "sha256 drift between jobs: $actual != $SHA256" >&2; exit 1; }
+          # The flat alias gets its own sidecar so copper-install.sh can verify
+          # the /downloads copy without parsing the catalog JSON.
+          printf '%s  copper-latest-macos-arm64.zip\n' "$SHA256" > "upload/${ZIP_NAME}.sha256"
+          cat "upload/${ZIP_NAME}.sha256"
+
+      - name: Publish release to the feed (product copper)
+        env:
+          FORCA_FEED_UPLOAD_TOKEN: ${{ secrets.FORCA_FEED_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$FORCA_FEED_UPLOAD_TOKEN" ] || { echo "::error::FORCA_FEED_UPLOAD_TOKEN secret is not set on this repo" >&2; exit 1; }
+          # Aliases only apply on an lkg finalize (a candidate to `downloads`
+          # is archive-only by feed policy); passing them on a candidate is
+          # harmless and keeps one code path.
+          node scripts/upload-to-forca-feed.mjs --target downloads \
+            --base-url "$FEED_BASE_URL" \
+            --product copper \
+            --release-id "$RELEASE_ID" \
+            --version "$VERSION" \
+            --commit "$COMMIT" \
+            --status "$STATUS" \
+            --tag "copper/v${VERSION}" \
+            --published-at "$PUBLISHED_AT" \
+            --alias "${ZIP_NAME}=copper-latest-macos-arm64.zip" \
+            --alias "${ZIP_NAME}.sha256=copper-latest-macos-arm64.zip.sha256" \
+            "upload/${ZIP_NAME}" \
+            "upload/${ZIP_NAME}.sha256" \
+            upload/copper-install.sh \
+            upload/copper-version.json
+
+      - name: Verify the immutable archive URL serves the exact bytes
+        run: |
+          set -euo pipefail
+          url="${FEED_BASE_URL}/releases/copper/${RELEASE_ID}/downloads/${ZIP_NAME}"
+          curl -fsSL --retry 3 -o /tmp/verify.zip "$url"
+          actual="$(sha256sum /tmp/verify.zip | cut -d' ' -f1)"
+          [ "$actual" = "$SHA256" ] || { echo "archive at $url does not match: $actual" >&2; exit 1; }
+          echo "OK $url"
+          if [ "$STATUS" = "lkg" ]; then
+            curl -fsSL -o /tmp/latest.zip "${FEED_BASE_URL}/downloads/copper-latest-macos-arm64.zip"
+            [ "$(sha256sum /tmp/latest.zip | cut -d' ' -f1)" = "$SHA256" ] || { echo "flat alias does not match" >&2; exit 1; }
+            curl -fsSL "${FEED_BASE_URL}/downloads/copper-install.sh" | head -n 3
+          fi
+
+      - name: Render and push Casks/copper.rb
+        id: cask
+        if: inputs.status == 'lkg'
+        run: |
+          set -euo pipefail
+          cli_flag=--no-cli
+          [ "$HAS_CLI" = "true" ] && cli_flag=--cli
+          node scripts/render-cask.mjs \
+            --version "$VERSION" \
+            --sha256 "$SHA256" \
+            --release-id "$RELEASE_ID" \
+            --commit "$COMMIT" \
+            "$cli_flag" > Casks/copper.rb
+          # The in-lab runner may not have ruby; check.yml evaluates the cask
+          # DSL with real Homebrew on every push anyway.
+          if command -v ruby >/dev/null 2>&1; then ruby -c Casks/copper.rb; fi
+          git config user.name "copper-release[bot]"
+          git config user.email "noreply@exowatt.com"
+          git add Casks/copper.rb
+          if git diff --cached --quiet; then
+            echo "::warning::cask already matches copper ${VERSION}; nothing to push"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "copper ${VERSION}" -m "Built from collinrijock/Copper@${COMMIT}" -m "Release ${RELEASE_ID}"
+            git push origin HEAD:main
+            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run summary
+        if: always()
+        env:
+          CASK_COMMIT: ${{ steps.cask.outputs.commit }}
+          REF: ${{ inputs.ref }}
+        run: |
+          {
+            echo "### Copper ${VERSION} (${STATUS})"
+            echo ""
+            echo "- source: \`${COPPER_REPO}@${REF}\` → https://github.com/${COPPER_REPO}/commit/${COMMIT}"
+            echo "- release id: \`${RELEASE_ID}\`"
+            echo "- sha256: \`${SHA256}\`"
+            echo "- CLI shim in bundle: \`${HAS_CLI}\`"
+            echo "- immutable archive: ${FEED_BASE_URL}/releases/copper/${RELEASE_ID}/downloads/${ZIP_NAME}"
+            if [ "$STATUS" = "lkg" ]; then
+              echo "- latest alias: ${FEED_BASE_URL}/downloads/copper-latest-macos-arm64.zip"
+              echo "- installer: \`curl -fsSL ${FEED_BASE_URL}/downloads/copper-install.sh | sh\`"
+              if [ -n "${CASK_COMMIT}" ]; then
+                echo "- cask bump: https://github.com/${GITHUB_REPOSITORY}/commit/${CASK_COMMIT}"
+              else
+                echo "- cask bump: skipped (already current)"
+              fi
+              echo "- upgrade: \`brew upgrade --cask copper\`"
+            else
+              echo "- candidate only: flat aliases and the cask were not changed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

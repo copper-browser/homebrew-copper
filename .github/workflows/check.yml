@@ -1,0 +1,59 @@
+name: Check
+
+# Why: release.yml rewrites Casks/copper.rb with the workflow's GITHUB_TOKEN,
+# and pushes made with that token do not trigger other workflows — so this runs
+# on human pushes/PRs and on demand (run it after a release to evaluate the
+# freshly rendered cask against current Homebrew).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    name: Scripts (node tests, sh syntax, shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/render-cask.test.mjs
+      - run: node --check scripts/upload-to-forca-feed.mjs
+      - run: sh -n scripts/copper-install.sh && bash -n scripts/package-app.sh
+      - run: shellcheck -s sh scripts/copper-install.sh && shellcheck scripts/package-app.sh
+      - name: ruby -c on the rendered cask (if one exists yet)
+        run: |
+          if [ -f Casks/copper.rb ]; then ruby -c Casks/copper.rb; else echo "no cask rendered yet"; fi
+
+  brew-readall:
+    name: brew readall (macOS)
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      HOMEBREW_NO_ENV_HINTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link this checkout as the exowatt-labs/copper tap
+        run: |
+          set -euo pipefail
+          taps="$(brew --repository)/Library/Taps/exowatt-labs"
+          mkdir -p "$taps"
+          ln -s "$PWD" "$taps/homebrew-copper"
+          brew tap
+      - name: Evaluate the cask DSL
+        run: |
+          if [ -f Casks/copper.rb ]; then
+            brew readall --aliases --no-simulate exowatt-labs/copper
+          else
+            echo "no cask rendered yet"
+          fi
+      - name: brew style (informational)
+        continue-on-error: true
+        run: brew style exowatt-labs/copper
