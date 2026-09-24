@@ -5,8 +5,8 @@
 # stock curl fetch works — no vendored download strategy, no GitHub token.
 
 cask "copper" do
-  version "1.0.20260924.4"
-  sha256 "911798b3868749fdfc7c5a8a5f230d1129aa40f679bee59cf6c82788e7503832"
+  version "1.0.20260924.5"
+  sha256 "78c37cfcc4100728b6680c600466d34258174dcb965ab6d827c0a6b3d409457c"
 
   url "https://forca.apps.exowatt.com/releases/copper/#{version}-g9efa6aaa0573/downloads/copper-#{version}-macos-arm64.zip"
   name "Copper"
