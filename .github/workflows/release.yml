@@ -256,7 +256,9 @@ jobs:
           if [ "$STATUS" = "lkg" ]; then
             curl -fsSL -o /tmp/latest.zip "${FEED_BASE_URL}/downloads/copper-latest-macos-arm64.zip"
             [ "$(sha256sum /tmp/latest.zip | cut -d' ' -f1)" = "$SHA256" ] || { echo "flat alias does not match" >&2; exit 1; }
-            curl -fsSL "${FEED_BASE_URL}/downloads/copper-install.sh" | head -n 3
+            curl -fsSL -o /tmp/copper-install.sh "${FEED_BASE_URL}/downloads/copper-install.sh"
+            cmp -s /tmp/copper-install.sh upload/copper-install.sh || { echo "published installer differs from the built one" >&2; exit 1; }
+            head -n 3 /tmp/copper-install.sh
           fi
 
       - name: Render and push Casks/copper.rb
