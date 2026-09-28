@@ -1,14 +1,14 @@
 # Rendered by scripts/render-cask.mjs in Exowatt-Labs/homebrew-copper — do not hand-edit
-# Built from collinrijock/Copper@38d6f3670470605da301f92851d7eadaf066c698 (branch fork).
+# Built from collinrijock/Copper@0c3829eff1092c60c8e4ca1bd88b8e970a81c83d (branch fork).
 # Why a plain `url`: the archive lives on forca.apps.exowatt.com, which is
 # internal-network-only DNS and deliberately not behind SSO, so Homebrew's
 # stock curl fetch works — no vendored download strategy, no GitHub token.
 
 cask "copper" do
-  version "1.0.20260928.28"
-  sha256 "e4a995a7581463bf11211b8254ac1465fd5694aea92a904a6bde850e210436bf"
+  version "1.0.20260928.29"
+  sha256 "1ed1bb6e937bbad483dc498dcf9629b8fbd60b1cf64d6e5c4c08f05280f0b6be"
 
-  url "https://forca.apps.exowatt.com/releases/copper/#{version}-g38d6f3670470/downloads/copper-#{version}-macos-arm64.zip"
+  url "https://forca.apps.exowatt.com/releases/copper/#{version}-g0c3829eff109/downloads/copper-#{version}-macos-arm64.zip"
   name "Copper"
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
   homepage "https://github.com/collinrijock/Copper"
