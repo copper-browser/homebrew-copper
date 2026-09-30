@@ -80,10 +80,15 @@ cask "copper" do
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
   homepage "https://github.com/collinrijock/Copper"
 
-  # Why: no \`auto_updates\` on purpose — Homebrew IS the macOS update path for
-  # Copper. Builds are ad-hoc signed, not notarized, so the app's own updater
-  # cannot swap the bundle in place; declaring auto_updates would make
-  # \`brew upgrade --cask copper\` a no-op unless the user passed --greedy.
+  # Why auto_updates: Copper updates itself from the same feed (it downloads
+  # and verifies the release in the background, then Settings › Updates swaps
+  # the bundle in and relaunches), so a plain \`brew upgrade\` must not
+  # replace the bundle under a running Copper with bytes it already has.
+  # Naming the cask still upgrades it — Homebrew treats named casks as
+  # greedy — so \`brew upgrade --cask copper\` and \`brew reinstall --cask
+  # copper\` remain the manual paths.
+  auto_updates true
+
   # No livecheck polling either: the feed is internal-only and the release
   # workflow rewrites this file on every release, so there is nothing for brew
   # to poll. The explicit skip stops \`brew audit --strict\` from guessing a

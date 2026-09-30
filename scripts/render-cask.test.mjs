@@ -28,8 +28,9 @@ test('renders the immutable feed URL and core stanzas', () => {
   assert.match(cask, /app "Copper\.app"/)
   assert.match(cask, /xattr", args: \["-cr"/)
   assert.match(cask, /zap trash:/)
-  // The stanzas are intentionally absent (the comments explain why).
-  assert.doesNotMatch(cask, /^\s*auto_updates\b/m)
+  // Copper updates itself from the feed; brew must not race it (the comment
+  // in the cask explains why). No livecheck: the feed is internal-only.
+  assert.match(cask, /^\s*auto_updates true$/m)
   assert.match(cask, /livecheck do\n\s+skip /)
   assert.ok(cask.endsWith('end\n'))
 })

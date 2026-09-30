@@ -5,9 +5,13 @@ browser for macOS ([collinrijock/Copper](https://github.com/collinrijock/Copper)
 branch `fork`). Copper ships a built-in MCP server that agents (phi, Claude Code)
 drive; this tap is how the team installs and upgrades it.
 
-Homebrew is the macOS install **and update** path. Builds are ad-hoc signed
-(no Apple Developer ID, not notarized), so the app cannot update itself in
-place; `brew upgrade --cask copper` does it instead. The cask's `postflight`
+Homebrew is the macOS **install** path. Updates come from Copper itself: it
+checks the same feed, downloads and verifies the newer release in the
+background, and Settings › Updates then swaps the bundle in and relaunches
+(see the Copper README, "Updating"). The cask declares `auto_updates`, so a
+plain `brew upgrade` leaves Copper alone; naming it (`brew upgrade --cask
+copper`) still upgrades, as does `brew reinstall --cask copper`. Builds are
+ad-hoc signed (no Apple Developer ID, not notarized); the cask's `postflight`
 clears the download quarantine flag so Gatekeeper lets an ad-hoc build launch.
 
 **Internal network only.** The archives live on `forca.apps.exowatt.com`, the
@@ -36,12 +40,20 @@ open-tab session (the curl installer does this for you automatically).
 
 ## Upgrade
 
+Normally you don't: Copper downloads and verifies the next release on its own
+and offers **Update** in Settings › Updates (and ⌘K), which relaunches into it
+with the tab session intact. The manual path, by name (a plain `brew upgrade`
+skips the cask because of `auto_updates`):
+
 ```sh
 brew upgrade --cask copper
 ```
 
 Quit Copper first; Homebrew replaces the bundle in place and the tab session is
-restored from `session.json` on relaunch.
+restored from `session.json` on relaunch. If Homebrew has lost track of the
+install (`brew info --cask copper` says *Not installed* while
+`/Applications/Copper.app` exists), `brew reinstall --cask copper --force`
+adopts the bundle that is there.
 
 ## Uninstall
 
