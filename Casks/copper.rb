@@ -1,22 +1,27 @@
 # Rendered by scripts/render-cask.mjs in Exowatt-Labs/homebrew-copper — do not hand-edit
-# Built from collinrijock/Copper@d5eeef8a6fa80072a160f5a0531e46f191dfb0ea (branch fork).
+# Built from collinrijock/Copper@44ec5a3937ddd041ae7c6566644108443aa0c995 (branch fork).
 # Why a plain `url`: the archive lives on forca.apps.exowatt.com, which is
 # internal-network-only DNS and deliberately not behind SSO, so Homebrew's
 # stock curl fetch works — no vendored download strategy, no GitHub token.
 
 cask "copper" do
-  version "1.0.20260929.32"
-  sha256 "26949056a518c765499897ad9065fddec64b814f208a789a3800998ae1a18a9d"
+  version "1.0.20260930.33"
+  sha256 "d725e6a15439b069316952a7cc909e234184c410dddceac8499ec72602e912f9"
 
-  url "https://forca.apps.exowatt.com/releases/copper/#{version}-gd5eeef8a6fa8/downloads/copper-#{version}-macos-arm64.zip"
+  url "https://forca.apps.exowatt.com/releases/copper/#{version}-g44ec5a3937dd/downloads/copper-#{version}-macos-arm64.zip"
   name "Copper"
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
   homepage "https://github.com/collinrijock/Copper"
 
-  # Why: no `auto_updates` on purpose — Homebrew IS the macOS update path for
-  # Copper. Builds are ad-hoc signed, not notarized, so the app's own updater
-  # cannot swap the bundle in place; declaring auto_updates would make
-  # `brew upgrade --cask copper` a no-op unless the user passed --greedy.
+  # Why auto_updates: Copper updates itself from the same feed (it downloads
+  # and verifies the release in the background, then Settings › Updates swaps
+  # the bundle in and relaunches), so a plain `brew upgrade` must not
+  # replace the bundle under a running Copper with bytes it already has.
+  # Naming the cask still upgrades it — Homebrew treats named casks as
+  # greedy — so `brew upgrade --cask copper` and `brew reinstall --cask
+  # copper` remain the manual paths.
+  auto_updates true
+
   # No livecheck polling either: the feed is internal-only and the release
   # workflow rewrites this file on every release, so there is nothing for brew
   # to poll. The explicit skip stops `brew audit --strict` from guessing a
