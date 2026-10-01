@@ -1,5 +1,5 @@
-# Rendered by scripts/render-cask.mjs in Exowatt-Labs/homebrew-copper — do not hand-edit
-# Built from collinrijock/Copper@43a3f4fd439572a82395c5f203bb622b076fb9cb (branch fork).
+# Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
+# Built from copper-browser/Copper@43a3f4fd439572a82395c5f203bb622b076fb9cb (branch fork).
 # Why a plain `url`: the archive lives on forca.apps.exowatt.com, which is
 # internal-network-only DNS and deliberately not behind SSO, so Homebrew's
 # stock curl fetch works — no vendored download strategy, no GitHub token.
@@ -11,7 +11,7 @@ cask "copper" do
   url "https://forca.apps.exowatt.com/releases/copper/#{version}-g43a3f4fd4395/downloads/copper-#{version}-macos-arm64.zip"
   name "Copper"
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
-  homepage "https://github.com/collinrijock/Copper"
+  homepage "https://github.com/copper-browser/Copper"
 
   # Why auto_updates: Copper updates itself from the same feed (it downloads
   # and verifies the release in the background, then Settings › Updates swaps

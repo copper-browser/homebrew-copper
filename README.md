@@ -1,9 +1,13 @@
 # homebrew-copper
 
-Private Homebrew tap for **Copper** — Exowatt's fork of the Copper WebKit
-browser for macOS ([collinrijock/Copper](https://github.com/collinrijock/Copper),
+Homebrew tap for **Copper**, a small, fast WebKit browser for macOS ([copper-browser/Copper](https://github.com/copper-browser/Copper),
 branch `fork`). Copper ships a built-in MCP server that agents (phi, Claude Code)
-drive; this tap is how the team installs and upgrades it.
+drive; this tap is how you install and upgrade it.
+
+> **Moved.** This tap and Copper now live in the `copper-browser` org. Archives
+> are still served from the old internal feed below, and the publish job still
+> targets its runner pool, so new releases can't publish from here until Copper
+> has new release hosting.
 
 Homebrew is the macOS **install** path. Updates come from Copper itself: it
 checks the same feed, downloads and verifies the newer release in the
@@ -25,14 +29,14 @@ download strategy (unlike `homebrew-forca`).
 Apple Silicon only for now (`depends_on arch: :arm64`), macOS 14 Sonoma or newer.
 
 ```sh
-brew tap exowatt-labs/copper            # private repo: needs `gh auth login` / git HTTPS creds once
-brew install --cask exowatt-labs/copper/copper
+brew tap copper-browser/copper
+brew install --cask copper-browser/copper/copper
 ```
 
 Already have `/Applications/Copper.app` from a manual build or the curl
 installer? Homebrew refuses to replace an app it did not install
 (`It seems there is already an App at '/Applications/Copper.app'`). Quit
-Copper and adopt it once with `brew install --cask --force exowatt-labs/copper/copper`.
+Copper and adopt it once with `brew install --cask --force copper-browser/copper/copper`.
 Your data lives in `~/Library/Application Support/Copper` and
 `~/Library/WebKit/com.collinrijock.copper`, not in the bundle. Back up
 `~/Library/Application Support/Copper/session.json` first if you care about the
@@ -85,13 +89,13 @@ it upgrades in place. It is the same bytes the cask installs.
 Releases are on-demand, from this repo:
 
 ```sh
-gh workflow run release.yml -R Exowatt-Labs/homebrew-copper -f ref=fork
-gh run watch -R Exowatt-Labs/homebrew-copper
+gh workflow run release.yml -R copper-browser/homebrew-copper -f ref=fork
+gh run watch -R copper-browser/homebrew-copper
 ```
 
 `.github/workflows/release.yml`:
 
-1. **build** (`macos-15`, GitHub-hosted): checks out `collinrijock/Copper@<ref>`
+1. **build** (`macos-15`, GitHub-hosted): checks out `copper-browser/Copper@<ref>`
    (public), runs `./build.sh release app`, stamps the release version into
    `CFBundleShortVersionString`, re-signs ad hoc, zips with `ditto --keepParent`
    (`scripts/package-app.sh`), and hands the artifact over.
@@ -103,7 +107,7 @@ gh run watch -R Exowatt-Labs/homebrew-copper
    using the workflow's own `GITHUB_TOKEN` (`permissions: contents: write` — no
    deploy key, because the workflow lives in the tap).
 
-Inputs: `ref` (default `fork`; any branch/tag/SHA of collinrijock/Copper) and
+Inputs: `ref` (default `fork`; any branch/tag/SHA of copper-browser/Copper) and
 `status` (default `lkg`). `lkg` publishes the flat `/downloads/` aliases and
 bumps the cask in one go — every run here is a human dispatch, so the dispatch
 is the approval (phi needs a separate candidate → LKG promotion because it
@@ -167,9 +171,9 @@ org-level `app-deploy` self-hosted runner pool, which serves every
   which is exactly what the cask's `postflight` and the installer do.
 - **`It seems there is already an App at '/Applications/Copper.app'`** — a
   non-Homebrew install predates the cask. Quit Copper, then
-  `brew install --cask --force exowatt-labs/copper/copper` once.
+  `brew install --cask --force copper-browser/copper/copper` once.
 - **`SHA256 mismatch`** — a release is mid-publish or the tap is stale.
-  `brew update` (or `git -C "$(brew --repository exowatt-labs/copper)" pull`) and retry; the
+  `brew update` (or `git -C "$(brew --repository copper-browser/copper)" pull`) and retry; the
   cask always points at an immutable archive, so a stale-but-complete tap
   never mismatches.
 - **My tab session disappeared after an upgrade** — copy the newest

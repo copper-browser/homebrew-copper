@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Renders Casks/copper.rb for the private Homebrew tap (Exowatt-Labs/homebrew-copper).
+// Renders Casks/copper.rb for the private Homebrew tap (copper-browser/homebrew-copper).
 // .github/workflows/release.yml runs this on every release; the cask is generated,
 // never hand-edited. Same shape as config/scripts/render-cask.mjs in Exowatt-Labs/forca.
 
@@ -65,8 +65,8 @@ export function renderCopperCask({ version, sha256, releaseId, commit, cli }) {
   # Contents/Resources/bin/copper. It is rendered automatically once it does.
 `
 
-  return `# Rendered by scripts/render-cask.mjs in Exowatt-Labs/homebrew-copper — do not hand-edit
-# Built from collinrijock/Copper@${commit} (branch fork).
+  return `# Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
+# Built from copper-browser/Copper@${commit} (branch fork).
 # Why a plain \`url\`: the archive lives on forca.apps.exowatt.com, which is
 # internal-network-only DNS and deliberately not behind SSO, so Homebrew's
 # stock curl fetch works — no vendored download strategy, no GitHub token.
@@ -78,7 +78,7 @@ cask "copper" do
   url "${url}"
   name "Copper"
   desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
-  homepage "https://github.com/collinrijock/Copper"
+  homepage "https://github.com/copper-browser/Copper"
 
   # Why auto_updates: Copper updates itself from the same feed (it downloads
   # and verifies the release in the background, then Settings › Updates swaps

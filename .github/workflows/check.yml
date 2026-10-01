@@ -40,7 +40,7 @@ jobs:
       HOMEBREW_NO_ENV_HINTS: '1'
     steps:
       - uses: actions/checkout@v4
-      - name: Link this checkout as the exowatt-labs/copper tap
+      - name: Link this checkout as the copper-browser/copper tap
         run: |
           set -euo pipefail
           taps="$(brew --repository)/Library/Taps/exowatt-labs"
@@ -50,10 +50,10 @@ jobs:
       - name: Evaluate the cask DSL
         run: |
           if [ -f Casks/copper.rb ]; then
-            brew readall --aliases --no-simulate exowatt-labs/copper
+            brew readall --aliases --no-simulate copper-browser/copper
           else
             echo "no cask rendered yet"
           fi
       - name: brew style (informational)
         continue-on-error: true
-        run: brew style exowatt-labs/copper
+        run: brew style copper-browser/copper

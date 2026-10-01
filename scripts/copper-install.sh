@@ -12,7 +12,7 @@
 # (forca.apps.exowatt.com is internal-only DNS).
 #
 # Prefer Homebrew if you have it — it is the same bytes with an upgrade path:
-#   brew tap exowatt-labs/copper && brew install --cask exowatt-labs/copper/copper
+#   brew tap copper-browser/copper && brew install --cask copper-browser/copper/copper
 #
 # Flags:
 #   --cli-only     only (re)link the CLI shim from the already-installed app
@@ -26,7 +26,7 @@
 #   COPPER_NO_LAUNCH    set to 1 to skip `open -a Copper`
 #
 # This file is published verbatim to the Forca feed by release.yml in
-# Exowatt-Labs/homebrew-copper — keep it dependency-free POSIX sh (no jq,
+# copper-browser/homebrew-copper — keep it dependency-free POSIX sh (no jq,
 # no python: a fresh Mac without the Xcode CLT must be able to run it).
 
 set -eu
@@ -256,7 +256,7 @@ main() {
 		printf 'CLI: %s\n' "$CLI_PATH"
 	fi
 	printf 'Upgrade later by re-running this script, or switch to Homebrew (same builds):\n'
-	printf '  brew tap exowatt-labs/copper && brew install --cask exowatt-labs/copper/copper\n'
+	printf '  brew tap copper-browser/copper && brew install --cask copper-browser/copper/copper\n'
 	printf '  brew upgrade --cask copper\n'
 }
 
