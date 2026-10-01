@@ -1,6 +1,6 @@
 name: Release Copper
 
-# Builds collinrijock/Copper@<ref> and distributes it internally:
+# Builds copper-browser/Copper@<ref> and distributes it internally:
 #   1. build   (macos-15, GitHub-hosted): ./build.sh → stamp version → zip
 #   2. publish ([self-hosted, app-deploy]): upload to forca.apps.exowatt.com as
 #      product `copper`, render Casks/copper.rb, push it to this tap's main.
@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "collinrijock/Copper git ref to build (branch, tag, or SHA)"
+        description: "copper-browser/Copper git ref to build (branch, tag, or SHA)"
         required: true
         default: fork
         type: string
@@ -44,7 +44,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  COPPER_REPO: collinrijock/Copper
+  COPPER_REPO: copper-browser/Copper
   FEED_BASE_URL: https://forca.apps.exowatt.com
 
 jobs:
@@ -149,7 +149,7 @@ jobs:
               version: e.VERSION,
               releaseId: e.RELEASE_ID,
               commit: e.COMMIT,
-              source: `https://github.com/collinrijock/Copper/commit/${e.COMMIT}`,
+              source: `https://github.com/copper-browser/Copper/commit/${e.COMMIT}`,
               status: e.STATUS,
               publishedAt: e.PUBLISHED_AT,
               arch: "arm64",
@@ -284,7 +284,7 @@ jobs:
             echo "::warning::cask already matches copper ${VERSION}; nothing to push"
             echo "skipped=true" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "copper ${VERSION}" -m "Built from collinrijock/Copper@${COMMIT}" -m "Release ${RELEASE_ID}"
+            git commit -m "copper ${VERSION}" -m "Built from copper-browser/Copper@${COMMIT}" -m "Release ${RELEASE_ID}"
             git push origin HEAD:main
             echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "skipped=false" >> "$GITHUB_OUTPUT"
