@@ -1,0 +1,62 @@
+name: Bump cask
+
+# Keeps Casks/copper.rb on the newest copper-browser/Copper release.
+#
+# Copper's own release.yml publishes each build as a GitHub release with a
+# copper-version.json manifest; this job reads it (public, no token), checks it
+# against the release's .sha256 sidecar, re-renders the cask and pushes it to
+# main with the workflow's own GITHUB_TOKEN. Nothing to configure: no secrets,
+# no cross-repo tokens. Runs hourly, on demand, and on a `copper-release`
+# repository_dispatch if a release job ever gets a token to ping it.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [copper-release]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump-cask
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Render from the latest release
+        id: render
+        run: node scripts/bump.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Syntax-check the cask
+        run: ruby -c Casks/copper.rb
+
+      - name: Push the bump
+        if: steps.render.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.render.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "copper-release[bot]"
+          git config user.email "copper-release[bot]@users.noreply.github.com"
+          git add Casks/copper.rb
+          git commit -m "copper ${VERSION}" -m "https://github.com/copper-browser/Copper/releases/tag/v${VERSION}"
+          git push origin HEAD:main
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.render.outputs.version }}
+          CHANGED: ${{ steps.render.outputs.changed }}
+        run: echo "copper ${VERSION} (changed=${CHANGED})" >> "$GITHUB_STEP_SUMMARY"

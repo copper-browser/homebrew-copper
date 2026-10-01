@@ -1,34 +1,26 @@
 # Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
-# Built from copper-browser/Copper@43a3f4fd439572a82395c5f203bb622b076fb9cb (branch fork).
-# Why a plain `url`: the archive lives on forca.apps.exowatt.com, which is
-# internal-network-only DNS and deliberately not behind SSO, so Homebrew's
-# stock curl fetch works — no vendored download strategy, no GitHub token.
+# Built from copper-browser/Copper@32c24a7ed0c427a74821f9acd770b46f167767cd (release v1.0.20261001.1).
 
 cask "copper" do
-  version "1.0.20260930.38"
-  sha256 "7655c1f62114f7962699dcbbf7d6c86fd56ba16cddb8d44d1b8a4cbfa7b8d98c"
+  version "1.0.20261001.1"
+  sha256 "a821bbb4e9b49afae57800b235ca70542b5f10ac6a97a923160822f1456e02fa"
 
-  url "https://forca.apps.exowatt.com/releases/copper/#{version}-g43a3f4fd4395/downloads/copper-#{version}-macos-arm64.zip"
+  url "https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-arm64.zip"
   name "Copper"
-  desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
+  desc "Small, fast WebKit browser with a built-in MCP server for agents"
   homepage "https://github.com/copper-browser/Copper"
 
-  # Why auto_updates: Copper updates itself from the same feed (it downloads
-  # and verifies the release in the background, then Settings › Updates swaps
-  # the bundle in and relaunches), so a plain `brew upgrade` must not
-  # replace the bundle under a running Copper with bytes it already has.
-  # Naming the cask still upgrades it — Homebrew treats named casks as
-  # greedy — so `brew upgrade --cask copper` and `brew reinstall --cask
+  # Why auto_updates: Copper updates itself from the same GitHub releases (it
+  # downloads and verifies the release in the background, then Settings ›
+  # Updates swaps the bundle in and relaunches), so a plain `brew upgrade`
+  # must not replace the bundle under a running Copper. Naming the cask still
+  # upgrades it — `brew upgrade --cask copper` and `brew reinstall --cask
   # copper` remain the manual paths.
   auto_updates true
 
-  # No livecheck polling either: the feed is internal-only and the release
-  # workflow rewrites this file on every release, so there is nothing for brew
-  # to poll. The explicit skip stops `brew audit --strict` from guessing a
-  # GitHub-tag livecheck off the homepage (which would report Copper's static
-  # VERSION file, 1.0, as "latest").
   livecheck do
-    skip "versions come from the internal release workflow, not the upstream repo"
+    url :url
+    strategy :github_latest
   end
 
   depends_on macos: :sonoma
@@ -42,12 +34,10 @@ cask "copper" do
 
   # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
   # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared — same reasoning as the forca and emu casks. Homebrew ≥ 7.0.6 warns
-  # that `postflight` is deprecated in favour of `postflight_steps`; kept as
-  # `postflight` deliberately so the cask evaluates on the older Homebrew the
-  # team's Macs still run (forca and emu do the same). Flip it in the renderer.
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Copper.app"]
+  # cleared. `postflight_steps` (Homebrew ≥ 7.0.6) rather than the
+  # deprecated `postflight` block; `brew install` updates Homebrew first.
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-cr", "{{appdir}}/Copper.app"]
   end
 
   # Why: Copper keeps its tab session and settings under its own Application

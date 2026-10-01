@@ -1,19 +1,22 @@
 #!/usr/bin/env node
 
-// Renders Casks/copper.rb for the private Homebrew tap (copper-browser/homebrew-copper).
-// .github/workflows/release.yml runs this on every release; the cask is generated,
-// never hand-edited. Same shape as config/scripts/render-cask.mjs in Exowatt-Labs/forca.
+// Renders Casks/copper.rb for the Homebrew tap copper-browser/homebrew-copper.
+// .github/workflows/bump.yml runs scripts/bump.mjs, which reads the newest
+// copper-browser/Copper release's copper-version.json and calls this; the cask
+// is generated, never hand-edited.
+//
+//   node scripts/render-cask.mjs --version X --sha256 HEX --commit SHA [--cli|--no-cli]
 
 import { pathToFileURL } from 'node:url'
 
-// <VERSION file>.<YYYYMMDD>.<github.run_number>, e.g. 1.0.20260924.3 — monotonic
+// <VERSION file>.<YYYYMMDD>.<github.run_number>, e.g. 1.0.20261001.1 — monotonic
 // for Homebrew's version comparison even when `fork` is rebased.
 const VERSION_PATTERN = /^\d+\.\d+\.\d{8}\.\d+$/
 const SHA256_PATTERN = /^[0-9a-f]{64}$/
-const RELEASE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/
 
-export const FEED_BASE_URL = 'https://forca.apps.exowatt.com'
+export const SOURCE_REPO = 'copper-browser/Copper'
+export const RELEASES_URL = `https://github.com/${SOURCE_REPO}/releases`
 
 function assertMatch(label, value, pattern, hint) {
   if (typeof value !== 'string' || !pattern.test(value)) {
@@ -25,34 +28,28 @@ export function zipName(version) {
   return `copper-${version}-macos-arm64.zip`
 }
 
-export function archiveUrl({ version, releaseId }) {
-  return `${FEED_BASE_URL}/releases/copper/${releaseId}/downloads/${zipName(version)}`
+/** The immutable, versioned release asset the cask pins (and its sha256 covers). */
+export function archiveUrl({ version }) {
+  return `${RELEASES_URL}/download/v${version}/${zipName(version)}`
 }
 
 /**
- * @param {{ version: string, sha256: string, releaseId: string, commit: string, cli: boolean }} input
+ * @param {{ version: string, sha256: string, commit: string, cli: boolean }} input
  * @returns {string} the complete Casks/copper.rb text, newline-terminated
  */
-export function renderCopperCask({ version, sha256, releaseId, commit, cli }) {
-  assertMatch('version', version, VERSION_PATTERN, 'expected MAJOR.MINOR.YYYYMMDD.RUN, e.g. 1.0.20260924.3')
+export function renderCopperCask({ version, sha256, commit, cli }) {
+  assertMatch('version', version, VERSION_PATTERN, 'expected MAJOR.MINOR.YYYYMMDD.RUN, e.g. 1.0.20261001.1')
   assertMatch('sha256', sha256, SHA256_PATTERN, 'expected 64 lowercase hex characters')
-  assertMatch('release-id', releaseId, RELEASE_ID_PATTERN, 'expected a feed-safe identifier')
   assertMatch('commit', commit, COMMIT_PATTERN, 'expected a full 40-character lowercase SHA')
   if (typeof cli !== 'boolean') throw new Error('cli must be a boolean')
 
-  // Why the immutable URL and not /downloads/copper-latest-macos-arm64.zip: the
-  // flat alias is overwritten by the next release, which would make this cask's
-  // sha256 fail for anyone who runs `brew install` between a feed publish and
-  // the matching tap bump — and would make an older cask revision uninstallable.
-  // The release-scoped archive never changes, so the cask stays self-consistent.
-  // Rendered with `#{version}` interpolated (Ruby, evaluated by Homebrew) so
-  // `brew audit` sees a versioned URL; the commit suffix of the release id is
-  // not derivable from the version, so it stays literal.
-  if (!releaseId.startsWith(`${version}-g`)) {
-    throw new Error(`release-id must be <version>-g<commit12>, got ${releaseId}`)
-  }
-  const releaseSuffix = releaseId.slice(version.length)
-  const url = `${FEED_BASE_URL}/releases/copper/#{version}${releaseSuffix}/downloads/copper-#{version}-macos-arm64.zip`
+  // Why the versioned asset and not releases/latest/download/copper-macos-arm64.zip:
+  // "latest" moves with the next release, which would break this cask's sha256
+  // for anyone installing between a release and the matching tap bump, and
+  // would make an older cask revision uninstallable. The tag's asset never
+  // changes. `#{version}` is interpolated by Homebrew so `brew audit` sees a
+  // versioned URL.
+  const url = `${RELEASES_URL}/download/v#{version}/copper-#{version}-macos-arm64.zip`
 
   const binaryStanza = cli
     ? `
@@ -66,10 +63,7 @@ export function renderCopperCask({ version, sha256, releaseId, commit, cli }) {
 `
 
   return `# Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
-# Built from copper-browser/Copper@${commit} (branch fork).
-# Why a plain \`url\`: the archive lives on forca.apps.exowatt.com, which is
-# internal-network-only DNS and deliberately not behind SSO, so Homebrew's
-# stock curl fetch works — no vendored download strategy, no GitHub token.
+# Built from ${SOURCE_REPO}@${commit} (release v${version}).
 
 cask "copper" do
   version "${version}"
@@ -77,25 +71,20 @@ cask "copper" do
 
   url "${url}"
   name "Copper"
-  desc "Exowatt's fork of Copper, a native WebKit browser for macOS with a built-in MCP server"
-  homepage "https://github.com/copper-browser/Copper"
+  desc "Small, fast WebKit browser with a built-in MCP server for agents"
+  homepage "https://github.com/${SOURCE_REPO}"
 
-  # Why auto_updates: Copper updates itself from the same feed (it downloads
-  # and verifies the release in the background, then Settings › Updates swaps
-  # the bundle in and relaunches), so a plain \`brew upgrade\` must not
-  # replace the bundle under a running Copper with bytes it already has.
-  # Naming the cask still upgrades it — Homebrew treats named casks as
-  # greedy — so \`brew upgrade --cask copper\` and \`brew reinstall --cask
+  # Why auto_updates: Copper updates itself from the same GitHub releases (it
+  # downloads and verifies the release in the background, then Settings ›
+  # Updates swaps the bundle in and relaunches), so a plain \`brew upgrade\`
+  # must not replace the bundle under a running Copper. Naming the cask still
+  # upgrades it — \`brew upgrade --cask copper\` and \`brew reinstall --cask
   # copper\` remain the manual paths.
   auto_updates true
 
-  # No livecheck polling either: the feed is internal-only and the release
-  # workflow rewrites this file on every release, so there is nothing for brew
-  # to poll. The explicit skip stops \`brew audit --strict\` from guessing a
-  # GitHub-tag livecheck off the homepage (which would report Copper's static
-  # VERSION file, 1.0, as "latest").
   livecheck do
-    skip "versions come from the internal release workflow, not the upstream repo"
+    url :url
+    strategy :github_latest
   end
 
   depends_on macos: :sonoma
@@ -105,12 +94,10 @@ cask "copper" do
 ${binaryStanza}
   # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
   # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared — same reasoning as the forca and emu casks. Homebrew ≥ 7.0.6 warns
-  # that \`postflight\` is deprecated in favour of \`postflight_steps\`; kept as
-  # \`postflight\` deliberately so the cask evaluates on the older Homebrew the
-  # team's Macs still run (forca and emu do the same). Flip it in the renderer.
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Copper.app"]
+  # cleared. \`postflight_steps\` (Homebrew ≥ 7.0.6) rather than the
+  # deprecated \`postflight\` block; \`brew install\` updates Homebrew first.
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-cr", "{{appdir}}/Copper.app"]
   end
 
   # Why: Copper keeps its tab session and settings under its own Application
@@ -133,7 +120,6 @@ export function parseRenderCaskArgs(argv) {
   const flags = new Map([
     ['--version', 'version'],
     ['--sha256', 'sha256'],
-    ['--release-id', 'releaseId'],
     ['--commit', 'commit'],
   ])
   for (let index = 0; index < argv.length; index += 1) {
@@ -153,11 +139,9 @@ export function parseRenderCaskArgs(argv) {
     parsed[key] = value
     index += 1
   }
-  for (const required of ['version', 'sha256', 'releaseId', 'commit']) {
+  for (const required of ['version', 'sha256', 'commit']) {
     if (parsed[required] === undefined) {
-      throw new Error(
-        'usage: render-cask.mjs --version X --sha256 HEX --release-id ID --commit SHA [--cli|--no-cli]'
-      )
+      throw new Error('usage: render-cask.mjs --version X --sha256 HEX --commit SHA [--cli|--no-cli]')
     }
   }
   return parsed

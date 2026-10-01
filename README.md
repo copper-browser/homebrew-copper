@@ -1,63 +1,37 @@
 # homebrew-copper
 
-Homebrew tap for **Copper**, a small, fast WebKit browser for macOS ([copper-browser/Copper](https://github.com/copper-browser/Copper),
-branch `fork`). Copper ships a built-in MCP server that agents (phi, Claude Code)
-drive; this tap is how you install and upgrade it.
-
-> **Moved.** This tap and Copper now live in the `copper-browser` org. Archives
-> are still served from the old internal feed below, and the publish job still
-> targets its runner pool, so new releases can't publish from here until Copper
-> has new release hosting.
-
-Homebrew is the macOS **install** path. Updates come from Copper itself: it
-checks the same feed, downloads and verifies the newer release in the
-background, and Settings › Updates then swaps the bundle in and relaunches
-(see the Copper README, "Updating"). The cask declares `auto_updates`, so a
-plain `brew upgrade` leaves Copper alone; naming it (`brew upgrade --cask
-copper`) still upgrades, as does `brew reinstall --cask copper`. Builds are
-ad-hoc signed (no Apple Developer ID, not notarized); the cask's `postflight`
-clears the download quarantine flag so Gatekeeper lets an ad-hoc build launch.
-
-**Internal network only.** The archives live on `forca.apps.exowatt.com`, the
-same internal release feed that serves FORCA and phi. It resolves only on the
-Exowatt network/VPN and is deliberately not behind SSO, so a plain Homebrew
-`url` works — no GitHub token, no `HOMEBREW_GITHUB_API_TOKEN`, no vendored
-download strategy (unlike `homebrew-forca`).
+Homebrew tap for **[Copper](https://github.com/copper-browser/Copper)** — a small, fast, quiet
+WebKit browser for macOS, with a built-in MCP server and `copper` CLI so agents (Claude Code,
+phi) can drive it.
 
 ## Install
 
-Apple Silicon only for now (`depends_on arch: :arm64`), macOS 14 Sonoma or newer.
-
 ```sh
-brew tap copper-browser/copper
 brew install --cask copper-browser/copper/copper
 ```
 
-Already have `/Applications/Copper.app` from a manual build or the curl
-installer? Homebrew refuses to replace an app it did not install
-(`It seems there is already an App at '/Applications/Copper.app'`). Quit
-Copper and adopt it once with `brew install --cask --force copper-browser/copper/copper`.
-Your data lives in `~/Library/Application Support/Copper` and
-`~/Library/WebKit/com.collinrijock.copper`, not in the bundle. Back up
-`~/Library/Application Support/Copper/session.json` first if you care about the
-open-tab session (the curl installer does this for you automatically).
+That taps `copper-browser/copper` and installs `/Applications/Copper.app` plus the `copper` CLI on
+your `PATH`. Apple Silicon, macOS 14 Sonoma or later. Public — no token, no VPN.
+
+Builds are ad-hoc signed (no Apple Developer ID, not notarized); the cask's `postflight` clears
+the download quarantine flag so Gatekeeper lets it launch.
+
+Already have a `/Applications/Copper.app` from a manual download or the curl installer? Homebrew
+refuses to replace an app it did not install (`It seems there is already an App at …`). Quit
+Copper and adopt it once with `brew install --cask --force copper-browser/copper/copper`. Your
+data lives in `~/Library/Application Support/Copper` and `~/Library/WebKit/com.collinrijock.copper`,
+not in the bundle.
 
 ## Upgrade
 
-Normally you don't: Copper downloads and verifies the next release on its own
-and offers **Update** in Settings › Updates (and ⌘K), which relaunches into it
-with the tab session intact. The manual path, by name (a plain `brew upgrade`
-skips the cask because of `auto_updates`):
+Normally you don't: Copper downloads and verifies the next release on its own and offers
+**Update** in Settings › Updates (and ⌘K), which relaunches into it with the tab session intact.
+The cask declares `auto_updates`, so a plain `brew upgrade` leaves it alone; by name it still
+upgrades:
 
 ```sh
 brew upgrade --cask copper
 ```
-
-Quit Copper first; Homebrew replaces the bundle in place and the tab session is
-restored from `session.json` on relaunch. If Homebrew has lost track of the
-install (`brew info --cask copper` says *Not installed* while
-`/Applications/Copper.app` exists), `brew reinstall --cask copper --force`
-adopts the bundle that is there.
 
 ## Uninstall
 
@@ -66,119 +40,46 @@ brew uninstall --cask copper            # remove the app (keeps your data)
 brew uninstall --zap --cask copper      # also delete session, WebKit site data, prefs, caches
 ```
 
-## The curl alternative
-
-No Homebrew, or a machine you just want the app on:
+## Without Homebrew
 
 ```sh
-curl -fsSL https://forca.apps.exowatt.com/downloads/copper-install.sh | sh
+curl -fsSL https://github.com/copper-browser/Copper/releases/latest/download/copper-install.sh | sh
 ```
 
-`scripts/copper-install.sh` downloads `copper-latest-macos-arm64.zip` from the
-feed, verifies its SHA-256 against the published sidecar, backs up
-`session.json`, quits a running Copper (only if it is the one being replaced),
-installs to `/Applications` (`COPPER_INSTALL_DIR` to override), clears
-quarantine, links the `copper` CLI shim into the first writable of
-`/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin` (`COPPER_BIN_DIR` to
-override) when the build ships one, and relaunches (`--no-launch` /
-`COPPER_NO_LAUNCH=1` to skip). `--cli-only` just re-links the shim. Re-running
-it upgrades in place. It is the same bytes the cask installs.
+or download [`copper-macos-arm64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-arm64.zip),
+move `Copper.app` to `/Applications`, and run `xattr -cr /Applications/Copper.app` once.
 
-## How a release is cut
+## How the cask stays current
 
-Releases are on-demand, from this repo:
+Releases are cut in the Copper repo, not here:
+`gh workflow run release.yml -R copper-browser/Copper -f ref=fork` builds on a GitHub-hosted Mac
+and publishes a `v<version>` GitHub release with the zip, its `.sha256`, `copper-version.json`
+and the installer.
 
-```sh
-gh workflow run release.yml -R copper-browser/homebrew-copper -f ref=fork
-gh run watch -R copper-browser/homebrew-copper
-```
-
-`.github/workflows/release.yml`:
-
-1. **build** (`macos-15`, GitHub-hosted): checks out `copper-browser/Copper@<ref>`
-   (public), runs `./build.sh release app`, stamps the release version into
-   `CFBundleShortVersionString`, re-signs ad hoc, zips with `ditto --keepParent`
-   (`scripts/package-app.sh`), and hands the artifact over.
-2. **publish** (`[self-hosted, app-deploy]`, in-lab — the feed is internal-only
-   DNS): uploads to the feed as product `copper` via the chunked upload protocol
-   (`scripts/upload-to-forca-feed.mjs`, ported verbatim from `Exowatt-Labs/phi`),
-   verifies the archived bytes, renders `Casks/copper.rb`
-   (`scripts/render-cask.mjs`) and pushes it to `main` as `copper-release[bot]`
-   using the workflow's own `GITHUB_TOKEN` (`permissions: contents: write` — no
-   deploy key, because the workflow lives in the tap).
-
-Inputs: `ref` (default `fork`; any branch/tag/SHA of copper-browser/Copper) and
-`status` (default `lkg`). `lkg` publishes the flat `/downloads/` aliases and
-bumps the cask in one go — every run here is a human dispatch, so the dispatch
-is the approval (phi needs a separate candidate → LKG promotion because it
-auto-publishes every main push; Copper does not). `status=candidate` archives
-the build under its immutable URL for testing and touches neither the aliases
-nor the cask.
-
-### Version scheme
-
-`<VERSION file>.<YYYYMMDD>.<github.run_number>` — e.g. `1.0.20260924.3`. The
-`VERSION` file in Copper is `1.0`; the date and run number make every release
-unique and monotonic for Homebrew's version comparison even when `fork` is
-rebased onto upstream. The same string is stamped into the app, so the About
-box and the MCP `serverInfo.version` match `brew info --cask copper`. The built
-commit is recorded in the cask header, in `copper-version.json`, and in the
-feed's release metadata (`commit`).
-
-### Where artifacts live
-
-| URL | What |
-|---|---|
-| `https://forca.apps.exowatt.com/releases/copper/<release_id>/downloads/copper-<version>-macos-arm64.zip` | Immutable archive — **what the cask points at**. `release_id` = `<version>-g<commit12>`. Never overwritten, so an older cask revision stays installable and the sha256 always matches. |
-| `https://forca.apps.exowatt.com/downloads/copper-latest-macos-arm64.zip` | Flat "latest" alias, rewritten by every `lkg` release — what the curl installer fetches. |
-| `…/downloads/copper-latest-macos-arm64.zip.sha256` | shasum-format digest of the alias, for the installer. |
-| `…/downloads/copper-install.sh` | The curl installer (published from `scripts/copper-install.sh` on every `lkg` release). |
-| `…/downloads/copper-version.json` | `{version, releaseId, commit, sha256, hasCli, archiveUrl, …}` for the latest release. |
-| `https://forca.apps.exowatt.com/api/releases/catalog` | Full catalog JSON (`releases.copper.*`, `current.copper`). |
-| `https://forca.apps.exowatt.com/` | Download page with the Copper card. |
-
-The feed keeps the newest 10 releases per product for at least 15 days
-(`Exowatt-Labs/forca-updates` retention policy).
-
-## Contents
+[`bump.yml`](.github/workflows/bump.yml) (hourly, or `gh workflow run bump.yml -R
+copper-browser/homebrew-copper`) reads the newest release's `copper-version.json`, checks it
+against the release's `.sha256` sidecar, re-renders `Casks/copper.rb` with
+[`scripts/render-cask.mjs`](scripts/render-cask.mjs) and pushes it to `main`. No secrets — the
+releases are public and the push uses the workflow's own `GITHUB_TOKEN`. The cask pins the
+versioned asset (`releases/download/v<version>/copper-<version>-macos-arm64.zip`), never
+`latest`, so its sha256 always matches.
 
 | Path | What it is |
 |---|---|
-| `Casks/copper.rb` | The cask. **Generated** by `release.yml` — do not hand-edit; the next release overwrites it. |
-| `scripts/render-cask.mjs` | Renders the cask from `--version --sha256 --release-id --commit [--cli]`. `binary` stanza only when the built bundle has `Contents/Resources/bin/copper`. |
-| `scripts/render-cask.test.mjs` | `node --test` coverage for the renderer. |
-| `scripts/package-app.sh` | Stamp version → ad-hoc re-sign → `ditto` zip + `.sha256`; prints `has_cli=`. |
-| `scripts/upload-to-forca-feed.mjs` | Chunked upload / finalize client for the feed (needs `FORCA_FEED_UPLOAD_TOKEN`). |
-| `scripts/copper-install.sh` | The curl installer. |
-| `.github/workflows/release.yml` | Build + publish + cask bump (`workflow_dispatch`). |
-| `.github/workflows/check.yml` | Renderer tests, shellcheck, `brew readall` of the cask on macOS. Bot pushes don't trigger it — `gh workflow run check.yml` after a release if you want the DSL re-evaluated. |
-
-Secrets/infra: `FORCA_FEED_UPLOAD_TOKEN` (repo Actions secret; same value as
-the feed app's `UPLOAD_TOKEN` and the secret of the same name on
-`Exowatt-Labs/phi` and `Exowatt-Labs/forca`). The publish job needs the
-org-level `app-deploy` self-hosted runner pool, which serves every
-`Exowatt-Labs` repo.
+| `Casks/copper.rb` | The cask. **Generated** — do not hand-edit; the next bump overwrites it. |
+| `scripts/render-cask.mjs` | Renders the cask from `--version --sha256 --commit [--cli]`. |
+| `scripts/bump.mjs` | Fetches the latest `copper-version.json`, verifies, renders, writes. |
+| `scripts/render-cask.test.mjs` | `node --test` coverage for both. |
+| `.github/workflows/bump.yml` | Hourly/on-demand cask bump. |
+| `.github/workflows/check.yml` | Tests + `brew readall` of the cask on macOS. |
 
 ## Troubleshooting
 
-- **`Could not resolve host: forca.apps.exowatt.com`** (brew fetch or the curl
-  installer) — you are off the Exowatt network. Connect to the VPN and retry.
-- **`brew tap` asks for a username/password** — the tap repo is private. Run
-  `gh auth login` (or `gh auth setup-git`) so git can use your GitHub
-  credentials over HTTPS, then retry.
-- **"Copper" can't be opened / is damaged** — the quarantine flag survived
-  (e.g. the app was copied around manually). `xattr -cr /Applications/Copper.app`,
-  which is exactly what the cask's `postflight` and the installer do.
-- **`It seems there is already an App at '/Applications/Copper.app'`** — a
-  non-Homebrew install predates the cask. Quit Copper, then
+- **"Copper" can't be opened / is damaged** — the quarantine flag survived (the app was copied
+  around manually). `xattr -cr /Applications/Copper.app`.
+- **`It seems there is already an App at '/Applications/Copper.app'`** — quit Copper, then
   `brew install --cask --force copper-browser/copper/copper` once.
-- **`SHA256 mismatch`** — a release is mid-publish or the tap is stale.
-  `brew update` (or `git -C "$(brew --repository copper-browser/copper)" pull`) and retry; the
-  cask always points at an immutable archive, so a stale-but-complete tap
-  never mismatches.
-- **My tab session disappeared after an upgrade** — copy the newest
-  `~/Library/Application Support/Copper/session.backup-*.json` (written by the
-  curl installer) back over `session.json` while Copper is quit.
-- **`brew upgrade --cask copper` says nothing to do but the feed has a newer
-  build** — the release ran as `status=candidate`, or the cask push failed;
-  check the run's summary on the Actions tab.
+- **`SHA256 mismatch`** — the tap is stale. `brew update` and retry.
+- **`brew upgrade --cask copper` says nothing to do but a newer release exists** — the hourly bump
+  hasn't run yet; `gh workflow run bump.yml -R copper-browser/homebrew-copper`, or just let Copper
+  update itself.

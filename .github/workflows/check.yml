@@ -1,9 +1,9 @@
 name: Check
 
-# Why: release.yml rewrites Casks/copper.rb with the workflow's GITHUB_TOKEN,
-# and pushes made with that token do not trigger other workflows — so this runs
-# on human pushes/PRs and on demand (run it after a release to evaluate the
-# freshly rendered cask against current Homebrew).
+# Why: bump.yml rewrites Casks/copper.rb with the workflow's GITHUB_TOKEN, and
+# pushes made with that token do not trigger other workflows — so this runs on
+# human pushes/PRs and on demand (run it after a bump to evaluate the freshly
+# rendered cask against current Homebrew).
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   scripts:
-    name: Scripts (node tests, sh syntax, shellcheck)
+    name: Scripts (node tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,9 +24,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --test scripts/render-cask.test.mjs
-      - run: node --check scripts/upload-to-forca-feed.mjs
-      - run: sh -n scripts/copper-install.sh && bash -n scripts/package-app.sh
-      - run: shellcheck -s sh scripts/copper-install.sh && shellcheck scripts/package-app.sh
+      - run: node --check scripts/bump.mjs
       - name: ruby -c on the rendered cask (if one exists yet)
         run: |
           if [ -f Casks/copper.rb ]; then ruby -c Casks/copper.rb; else echo "no cask rendered yet"; fi
@@ -43,7 +41,7 @@ jobs:
       - name: Link this checkout as the copper-browser/copper tap
         run: |
           set -euo pipefail
-          taps="$(brew --repository)/Library/Taps/exowatt-labs"
+          taps="$(brew --repository)/Library/Taps/copper-browser"
           mkdir -p "$taps"
           ln -s "$PWD" "$taps/homebrew-copper"
           brew tap
@@ -57,3 +55,38 @@ jobs:
       - name: brew style (informational)
         continue-on-error: true
         run: brew style copper-browser/copper
+
+  install:
+    name: brew install --cask (clean macOS)
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      HOMEBREW_NO_ENV_HINTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link this checkout as the copper-browser/copper tap
+        run: |
+          set -euo pipefail
+          taps="$(brew --repository)/Library/Taps/copper-browser"
+          mkdir -p "$taps"
+          ln -s "$PWD" "$taps/homebrew-copper"
+      - name: Install
+        run: brew install --cask copper-browser/copper/copper 2>&1 | tee install.log
+      - name: No deprecation warnings
+        run: |
+          if grep -iE 'deprecated|Please report this issue' install.log; then
+            echo "::error::the cask triggers Homebrew warnings"; exit 1
+          fi
+      - name: App is installed, unquarantined, signed, and the CLI is linked
+        run: |
+          set -euo pipefail
+          test -d /Applications/Copper.app
+          if xattr -p com.apple.quarantine /Applications/Copper.app 2>/dev/null; then
+            echo "::error::quarantine flag survived the postflight"; exit 1
+          fi
+          codesign --verify --deep --strict /Applications/Copper.app
+          defaults read /Applications/Copper.app/Contents/Info CFBundleShortVersionString
+          test -L "$(brew --prefix)/bin/copper"
+          "$(brew --prefix)/bin/copper" --help >/dev/null 2>&1 || "$(brew --prefix)/bin/copper" health || true
+      - name: Uninstall
+        run: brew uninstall --zap --cask copper
