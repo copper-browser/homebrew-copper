@@ -5,7 +5,11 @@
 // copper-browser/Copper release's copper-version.json and calls this; the cask
 // is generated, never hand-edited.
 //
-//   node scripts/render-cask.mjs --version X --sha256 HEX --commit SHA [--cli|--no-cli]
+//   node scripts/render-cask.mjs --version X --sha256 HEX [--x86_64-sha256 HEX] --commit SHA [--cli|--no-cli]
+//
+// --sha256 is the Apple Silicon (arm64) zip's. With --x86_64-sha256 (every
+// release from the first Intel build on) the cask installs on Intel Macs too,
+// each CPU getting its own zip; without it the cask stays Apple Silicon only.
 
 import { pathToFileURL } from 'node:url'
 
@@ -24,22 +28,24 @@ function assertMatch(label, value, pattern, hint) {
   }
 }
 
-export function zipName(version) {
-  return `copper-${version}-macos-arm64.zip`
+export function zipName(version, arch = 'arm64') {
+  return `copper-${version}-macos-${arch}.zip`
 }
 
 /** The immutable, versioned release asset the cask pins (and its sha256 covers). */
-export function archiveUrl({ version }) {
-  return `${RELEASES_URL}/download/v${version}/${zipName(version)}`
+export function archiveUrl({ version }, arch = 'arm64') {
+  return `${RELEASES_URL}/download/v${version}/${zipName(version, arch)}`
 }
 
 /**
- * @param {{ version: string, sha256: string, commit: string, cli: boolean }} input
+ * @param {{ version: string, sha256: string, x86_64Sha256?: string, commit: string, cli: boolean }} input
  * @returns {string} the complete Casks/copper.rb text, newline-terminated
  */
-export function renderCopperCask({ version, sha256, commit, cli }) {
+export function renderCopperCask({ version, sha256, x86_64Sha256, commit, cli }) {
   assertMatch('version', version, VERSION_PATTERN, 'expected MAJOR.MINOR.YYYYMMDD.RUN, e.g. 1.0.20261001.1')
   assertMatch('sha256', sha256, SHA256_PATTERN, 'expected 64 lowercase hex characters')
+  const intel = x86_64Sha256 !== undefined
+  if (intel) assertMatch('x86_64 sha256', x86_64Sha256, SHA256_PATTERN, 'expected 64 lowercase hex characters')
   assertMatch('commit', commit, COMMIT_PATTERN, 'expected a full 40-character lowercase SHA')
   if (typeof cli !== 'boolean') throw new Error('cli must be a boolean')
 
@@ -49,7 +55,19 @@ export function renderCopperCask({ version, sha256, commit, cli }) {
   // would make an older cask revision uninstallable. The tag's asset never
   // changes. `#{version}` is interpolated by Homebrew so `brew audit` sees a
   // versioned URL.
-  const url = `${RELEASES_URL}/download/v#{version}/copper-#{version}-macos-arm64.zip`
+  // Both CPUs: Homebrew's `arch` stanza picks arm64 or x86_64 into `#{arch}`
+  // and the matching sha256.
+  const url = `${RELEASES_URL}/download/v#{version}/copper-#{version}-macos-${intel ? '#{arch}' : 'arm64'}.zip`
+  const head = intel
+    ? `  arch arm: "arm64", intel: "x86_64"
+
+  version "${version}"
+  sha256 arm:   "${sha256}",
+         intel: "${x86_64Sha256}"`
+    : `  version "${version}"
+  sha256 "${sha256}"`
+  const archStanza = intel ? '' : `
+  depends_on arch: :arm64`
 
   const binaryStanza = cli
     ? `
@@ -66,8 +84,7 @@ export function renderCopperCask({ version, sha256, commit, cli }) {
 # Built from ${SOURCE_REPO}@${commit} (release v${version}).
 
 cask "copper" do
-  version "${version}"
-  sha256 "${sha256}"
+${head}
 
   url "${url}"
   name "Copper"
@@ -87,8 +104,7 @@ cask "copper" do
     strategy :github_latest
   end
 
-  depends_on macos: :sonoma
-  depends_on arch: :arm64
+  depends_on macos: :sonoma${archStanza}
 
   app "Copper.app"
 ${binaryStanza}
@@ -120,6 +136,7 @@ export function parseRenderCaskArgs(argv) {
   const flags = new Map([
     ['--version', 'version'],
     ['--sha256', 'sha256'],
+    ['--x86_64-sha256', 'x86_64Sha256'],
     ['--commit', 'commit'],
   ])
   for (let index = 0; index < argv.length; index += 1) {
@@ -141,7 +158,7 @@ export function parseRenderCaskArgs(argv) {
   }
   for (const required of ['version', 'sha256', 'commit']) {
     if (parsed[required] === undefined) {
-      throw new Error('usage: render-cask.mjs --version X --sha256 HEX --commit SHA [--cli|--no-cli]')
+      throw new Error('usage: render-cask.mjs --version X --sha256 HEX [--x86_64-sha256 HEX] --commit SHA [--cli|--no-cli]')
     }
   }
   return parsed

@@ -79,3 +79,44 @@ test('manifest → cask input', () => {
   assert.throws(() => caskInputFromManifest({ ...manifest, zip: 'other.zip' }), /does not match/)
   assert.throws(() => caskInputFromManifest({ ...manifest, archiveUrl: 'https://example.com/x.zip' }), /archiveUrl/)
 })
+
+test('both CPUs: arch stanza, per-CPU sha256, no arm64-only dependency', () => {
+  const both = { ...input, x86_64Sha256: 'b'.repeat(64) }
+  const cask = renderCopperCask(both)
+  assert.match(cask, /^\s*arch arm: "arm64", intel: "x86_64"$/m)
+  assert.match(cask, new RegExp(`sha256 arm:\\s+"${'a'.repeat(64)}",\\n\\s+intel: "${'b'.repeat(64)}"`))
+  const urlStanza = cask.match(/^\s*url "([^"]+)"/m)?.[1]
+  assert.equal(
+    urlStanza,
+    'https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-#{arch}.zip'
+  )
+  for (const arch of ['arm64', 'x86_64']) {
+    assert.equal(urlStanza.replaceAll('#{version}', input.version).replace('#{arch}', arch), archiveUrl(input, arch))
+  }
+  assert.doesNotMatch(cask, /depends_on arch/)
+  assert.match(cask, /depends_on macos: :sonoma/)
+  assert.match(renderCopperCask(input), /depends_on arch: :arm64/)
+  assert.throws(() => renderCopperCask({ ...both, x86_64Sha256: 'xyz' }), /invalid x86_64 sha256/)
+  assert.equal(parseRenderCaskArgs([
+    '--version', input.version, '--sha256', input.sha256, '--x86_64-sha256', 'b'.repeat(64), '--commit', input.commit, '--cli',
+  ]).x86_64Sha256, 'b'.repeat(64))
+})
+
+test('manifest with archives → cask input for both CPUs', () => {
+  const manifest = {
+    product: 'copper',
+    version: input.version,
+    sha256: input.sha256,
+    commit: input.commit,
+    hasCli: true,
+    zip: `copper-${input.version}-macos-arm64.zip`,
+    archiveUrl: archiveUrl(input),
+    archives: {
+      arm64: { zip: `copper-${input.version}-macos-arm64.zip`, sha256: input.sha256, archiveUrl: archiveUrl(input) },
+      x86_64: { zip: `copper-${input.version}-macos-x86_64.zip`, sha256: 'b'.repeat(64), archiveUrl: archiveUrl(input, 'x86_64') },
+    },
+  }
+  assert.deepEqual(caskInputFromManifest(manifest), { ...input, x86_64Sha256: 'b'.repeat(64) })
+  const wrongZip = { ...manifest, archives: { ...manifest.archives, x86_64: { ...manifest.archives.x86_64, zip: 'other.zip' } } }
+  assert.throws(() => caskInputFromManifest(wrongZip), /x86_64 zip/)
+})
