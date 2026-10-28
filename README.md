@@ -11,7 +11,7 @@ brew install --cask copper-browser/copper/copper
 ```
 
 That taps `copper-browser/copper` and installs `/Applications/Copper.app` plus the `copper` CLI on
-your `PATH`. Apple Silicon, macOS 14 Sonoma or later. Public — no token, no VPN.
+your `PATH`. Apple Silicon or Intel (each gets its own build), macOS 14 Sonoma or later. Public — no token, no VPN.
 
 Builds are ad-hoc signed (no Apple Developer ID, not notarized); the cask's `postflight` clears
 the download quarantine flag so Gatekeeper lets it launch.
@@ -46,7 +46,8 @@ brew uninstall --zap --cask copper      # also delete session, WebKit site data,
 curl -fsSL https://github.com/copper-browser/Copper/releases/latest/download/copper-install.sh | sh
 ```
 
-or download [`copper-macos-arm64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-arm64.zip),
+or download [`copper-macos-arm64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-arm64.zip)
+(Apple Silicon) or [`copper-macos-x86_64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-x86_64.zip) (Intel),
 move `Copper.app` to `/Applications`, and run `xattr -cr /Applications/Copper.app` once.
 
 ## How the cask stays current
@@ -61,7 +62,8 @@ copper-browser/homebrew-copper`) reads the newest release's `copper-version.json
 against the release's `.sha256` sidecar, re-renders `Casks/copper.rb` with
 [`scripts/render-cask.mjs`](scripts/render-cask.mjs) and pushes it to `main`. No secrets — the
 releases are public and the push uses the workflow's own `GITHUB_TOKEN`. The cask pins the
-versioned asset (`releases/download/v<version>/copper-<version>-macos-arm64.zip`), never
+versioned asset (`releases/download/v<version>/copper-<version>-macos-<arch>.zip`, `arm64` or
+`x86_64` through the cask's `arch` stanza), never
 `latest`, so its sha256 always matches.
 
 | Path | What it is |

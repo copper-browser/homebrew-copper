@@ -32,7 +32,19 @@ export function caskInputFromManifest(manifest) {
   if (manifest.archiveUrl !== archiveUrl({ version })) {
     throw new Error(`manifest archiveUrl ${manifest.archiveUrl} is not ${archiveUrl({ version })}`)
   }
-  return { version, sha256, commit, cli: hasCli === true }
+  const input = { version, sha256, commit, cli: hasCli === true }
+  // Intel: releases from the first x86_64 build on list it under archives.
+  const intel = manifest.archives?.x86_64
+  if (intel) {
+    if (intel.zip !== zipName(version, 'x86_64')) {
+      throw new Error(`manifest x86_64 zip ${intel.zip} does not match version ${version}`)
+    }
+    if (intel.archiveUrl !== archiveUrl({ version }, 'x86_64')) {
+      throw new Error(`manifest x86_64 archiveUrl ${intel.archiveUrl} is not ${archiveUrl({ version }, 'x86_64')}`)
+    }
+    input.x86_64Sha256 = intel.sha256
+  }
+  return input
 }
 
 async function main(argv) {
@@ -47,10 +59,13 @@ async function main(argv) {
   const manifest = JSON.parse(await fetchText(manifestUrl))
   const input = caskInputFromManifest(manifest)
 
-  const sidecar = await fetchText(`${archiveUrl(input)}.sha256`)
-  const published = sidecar.trim().split(/\s+/)[0]
-  if (published !== input.sha256) {
-    throw new Error(`sha256 sidecar (${published}) disagrees with the manifest (${input.sha256})`)
+  const arches = input.x86_64Sha256 ? [['arm64', input.sha256], ['x86_64', input.x86_64Sha256]] : [['arm64', input.sha256]]
+  for (const [arch, want] of arches) {
+    const sidecar = await fetchText(`${archiveUrl(input, arch)}.sha256`)
+    const published = sidecar.trim().split(/\s+/)[0]
+    if (published !== want) {
+      throw new Error(`${arch} sha256 sidecar (${published}) disagrees with the manifest (${want})`)
+    }
   }
 
   const next = renderCopperCask(input)
