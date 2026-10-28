@@ -1,11 +1,14 @@
 # Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
-# Built from copper-browser/Copper@4793039d85ad49310d3942fca53b5da271c75c1e (release v1.0.20261027.82).
+# Built from copper-browser/Copper@f272a9bd9a434ca3e44d08ba1ddba30fc91b1f5e (release v1.0.20261028.86).
 
 cask "copper" do
-  version "1.0.20261027.82"
-  sha256 "e4b5ecbc73da9138f300c745d83dddce14f20c3435a88a77f91708539a0d7aab"
+  arch arm: "arm64", intel: "x86_64"
 
-  url "https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-arm64.zip"
+  version "1.0.20261028.86"
+  sha256 arm:   "d27bbe83fd1a553c98a0a6a4f277b283dac83aaaa36c2c566d33cad406184922",
+         intel: "c6ed3e2762af93cd852cc8550b3c630320a4f50041a4a629b739d4e72ca4a468"
+
+  url "https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-#{arch}.zip"
   name "Copper"
   desc "Small, fast WebKit browser with a built-in MCP server for agents"
   homepage "https://github.com/copper-browser/Copper"
@@ -24,7 +27,6 @@ cask "copper" do
   end
 
   depends_on macos: :sonoma
-  depends_on arch: :arm64
 
   app "Copper.app"
 
