@@ -1,12 +1,12 @@
 # Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
-# Built from copper-browser/Copper@3dbc7ccf12eaf14b53b920f5a9d39f9aba055ca5 (release v1.0.20261030.100).
+# Built from copper-browser/Copper@90f8c98ec1cff472029a13b3f14418b3ab115848 (release v1.0.20261030.101).
 
 cask "copper" do
   arch arm: "arm64", intel: "x86_64"
 
-  version "1.0.20261030.100"
-  sha256 arm:   "190948a29412624514235a9888b476920a909ae8830cd06fee7cacc3c1b56495",
-         intel: "99031da4fd02728dddd74568ad8d674ff6d9f9dcd1307dce46d7b12f81a7b87b"
+  version "1.0.20261030.101"
+  sha256 arm:   "4a460c17d6b6c9b02a3b97d5a1ff4503575fa5337601d0927d042ed6ce94f5f2",
+         intel: "be466148b0f1b02841122916eea17340df5cdfff79d0cdd00bccc7e886878cfb"
 
   url "https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-#{arch}.zip"
   name "Copper"
