@@ -1,0 +1,17 @@
+# Roadrunner CI (Woodpecker + Dagger, https://cicd.apps.exowatt.com): the cask scripts' tests and
+# a Ruby syntax check of the rendered cask. Docs: https://cicd.docs.exowatt.com/roadrunner/
+labels:
+  tier: "0"
+when:
+  - event: pull_request
+  - event: push
+    branch: main
+  - event: manual
+steps:
+  - name: scripts
+    image: bash
+    commands:
+      - >-
+        ci-dagger v0.10.1 container-run --src=. --repo=homebrew-copper --apt=ruby
+        --image=public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+        --run='node --test scripts/render-cask.test.mjs && node --check scripts/bump.mjs && if [ -f Casks/copper.rb ]; then ruby -c Casks/copper.rb; else echo "no cask rendered yet"; fi'

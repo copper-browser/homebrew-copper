@@ -1,0 +1,18 @@
+# Roadrunner (Woodpecker, https://cicd.apps.exowatt.com): keep Casks/copper.rb on the newest
+# copper-browser/Copper release. Hourly cron "bump" (and manual): ci/bump.sh renders the cask from
+# the release's copper-version.json, checks it, and pushes it to main as exowatt-woodpecker-bot.
+labels:
+  tier: "0"
+when:
+  - event: cron
+    cron: bump
+  - event: manual
+    branch: main
+steps:
+  - name: bump
+    image: bash
+    environment:
+      GH_TOKEN:
+        from_secret: github_release_token
+    commands:
+      - bash ci/bump.sh
