@@ -1,0 +1,77 @@
+name: Check (macOS)
+
+# The macOS cask checks stay on GitHub Actions for now; the script tests and the hourly bump
+# run on Roadrunner (.woodpecker/ci.yaml, bump.yaml). Bumps pushed by the Roadrunner bot do
+# trigger this.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  brew-readall:
+    name: brew readall (macOS)
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      HOMEBREW_NO_ENV_HINTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link this checkout as the copper-browser/copper tap
+        run: |
+          set -euo pipefail
+          taps="$(brew --repository)/Library/Taps/copper-browser"
+          mkdir -p "$taps"
+          ln -s "$PWD" "$taps/homebrew-copper"
+          brew tap
+      - name: Evaluate the cask DSL
+        run: |
+          if [ -f Casks/copper.rb ]; then
+            brew readall --aliases --no-simulate copper-browser/copper
+          else
+            echo "no cask rendered yet"
+          fi
+      - name: brew style (informational)
+        continue-on-error: true
+        run: brew style copper-browser/copper
+
+  install:
+    name: brew install --cask (clean macOS)
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      HOMEBREW_NO_ENV_HINTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link this checkout as the copper-browser/copper tap
+        run: |
+          set -euo pipefail
+          taps="$(brew --repository)/Library/Taps/copper-browser"
+          mkdir -p "$taps"
+          ln -s "$PWD" "$taps/homebrew-copper"
+      - name: Install
+        run: brew install --cask copper-browser/copper/copper 2>&1 | tee install.log
+      - name: No deprecation warnings
+        run: |
+          if grep -iE 'deprecated|Please report this issue' install.log; then
+            echo "::error::the cask triggers Homebrew warnings"; exit 1
+          fi
+      - name: App is installed, unquarantined, signed, and the CLI is linked
+        run: |
+          set -euo pipefail
+          test -d /Applications/Copper.app
+          if xattr -p com.apple.quarantine /Applications/Copper.app 2>/dev/null; then
+            echo "::error::quarantine flag survived the postflight"; exit 1
+          fi
+          codesign --verify --deep --strict /Applications/Copper.app
+          defaults read /Applications/Copper.app/Contents/Info CFBundleShortVersionString
+          test -L "$(brew --prefix)/bin/copper"
+          "$(brew --prefix)/bin/copper" --help >/dev/null 2>&1 || "$(brew --prefix)/bin/copper" health || true
+      - name: Uninstall
+        run: brew uninstall --zap --cask copper
