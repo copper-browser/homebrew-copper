@@ -108,13 +108,8 @@ ${head}
 
   app "Copper.app"
 ${binaryStanza}
-  # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
-  # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared. \`postflight_steps\` (Homebrew ≥ 7.0.6) rather than the
-  # deprecated \`postflight\` block; \`brew install\` updates Homebrew first.
-  postflight_steps do
-    run "/usr/bin/xattr", args: ["-cr", "{{appdir}}/Copper.app"]
-  end
+  # Nothing clears the quarantine flag: releases are signed with Copper's
+  # Developer ID and notarized, so Gatekeeper opens the app as downloaded.
 
   # Why: Copper keeps its tab session and settings under its own Application
   # Support dir; WebKit keeps site data under the bundle id. Nothing here is
