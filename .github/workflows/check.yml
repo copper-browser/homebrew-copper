@@ -62,14 +62,15 @@ jobs:
           if grep -iE 'deprecated|Please report this issue' install.log; then
             echo "::error::the cask triggers Homebrew warnings"; exit 1
           fi
-      - name: App is installed, unquarantined, signed, and the CLI is linked
+      - name: App is installed, signed, and the CLI is linked
         run: |
           set -euo pipefail
           test -d /Applications/Copper.app
-          if xattr -p com.apple.quarantine /Applications/Copper.app 2>/dev/null; then
-            echo "::error::quarantine flag survived the postflight"; exit 1
-          fi
           codesign --verify --deep --strict /Applications/Copper.app
+          # Notarized releases open with the quarantine flag on; one from
+          # before notarization still needs its flag cleared by hand.
+          spctl -a -vvv -t exec /Applications/Copper.app \
+            || echo "::warning::Gatekeeper does not accept this build as notarized (a release from before the switch)"
           defaults read /Applications/Copper.app/Contents/Info CFBundleShortVersionString
           test -L "$(brew --prefix)/bin/copper"
           "$(brew --prefix)/bin/copper" --help >/dev/null 2>&1 || "$(brew --prefix)/bin/copper" health || true

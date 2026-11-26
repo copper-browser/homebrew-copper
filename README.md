@@ -13,8 +13,8 @@ brew install --cask copper-browser/copper/copper
 That taps `copper-browser/copper` and installs `/Applications/Copper.app` plus the `copper` CLI on
 your `PATH`. Apple Silicon or Intel (each gets its own build), macOS 14 Sonoma or later. Public — no token, no VPN.
 
-Builds are ad-hoc signed (no Apple Developer ID, not notarized); the cask's `postflight` clears
-the download quarantine flag so Gatekeeper lets it launch.
+Builds are signed with Copper's Developer ID and notarized by Apple, so Gatekeeper opens them as
+they are; the cask needs no postflight.
 
 Already have a `/Applications/Copper.app` from a manual download or the curl installer? Homebrew
 refuses to replace an app it did not install (`It seems there is already an App at …`). Quit
@@ -48,7 +48,7 @@ curl -fsSL https://github.com/copper-browser/Copper/releases/latest/download/cop
 
 or download [`copper-macos-arm64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-arm64.zip)
 (Apple Silicon) or [`copper-macos-x86_64.zip`](https://github.com/copper-browser/Copper/releases/latest/download/copper-macos-x86_64.zip) (Intel),
-move `Copper.app` to `/Applications`, and run `xattr -cr /Applications/Copper.app` once.
+and move `Copper.app` to `/Applications`.
 
 ## How the cask stays current
 
@@ -77,8 +77,8 @@ versioned asset (`releases/download/v<version>/copper-<version>-macos-<arch>.zip
 
 ## Troubleshooting
 
-- **"Copper" can't be opened / is damaged** — the quarantine flag survived (the app was copied
-  around manually). `xattr -cr /Applications/Copper.app`.
+- **"Copper" can't be opened / is damaged** — a build from before notarization (1.0.20261124.117 and
+  older) with its quarantine flag on. `xattr -cr /Applications/Copper.app`, or update.
 - **`It seems there is already an App at '/Applications/Copper.app'`** — quit Copper, then
   `brew install --cask --force copper-browser/copper/copper` once.
 - **`SHA256 mismatch`** — the tap is stale. `brew update` and retry.

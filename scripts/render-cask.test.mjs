@@ -26,7 +26,8 @@ test('renders the versioned GitHub release URL and core stanzas', () => {
   assert.equal(urlStanza.replaceAll('#{version}', input.version), archiveUrl(input))
   assert.match(cask, /depends_on macos: :sonoma/)
   assert.match(cask, /app "Copper\.app"/)
-  assert.match(cask, /postflight_steps do\n\s+run "\/usr\/bin\/xattr", args: \["-cr", "\{\{appdir\}\}\/Copper\.app"\]/)
+  // Notarized releases: nothing clears the quarantine flag.
+  assert.doesNotMatch(cask, /xattr|postflight/)
   assert.match(cask, /zap trash:/)
   assert.match(cask, /^\s*auto_updates true$/m)
   assert.match(cask, /livecheck do\n\s+url :url\n\s+strategy :github_latest/)
