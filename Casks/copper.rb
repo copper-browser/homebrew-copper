@@ -1,12 +1,12 @@
 # Rendered by scripts/render-cask.mjs in copper-browser/homebrew-copper — do not hand-edit
-# Built from copper-browser/Copper@7904d9152aad03c2edcef60dcd1dcb4e8b80fa2d (release v1.0.20261124.117).
+# Built from copper-browser/Copper@72dff3d228a243661fe32faa6345386b4618334c (release v1.0.20261126.125).
 
 cask "copper" do
   arch arm: "arm64", intel: "x86_64"
 
-  version "1.0.20261124.117"
-  sha256 arm:   "1f61af1db311d78dc9deee2cb509310777cb016a9c647d48b7c9cb87b71eaec9",
-         intel: "5299990e23afe47e77ad6741b29f487634d90ccb9c0ebef7f02eae3b244c8d96"
+  version "1.0.20261126.125"
+  sha256 arm:   "b51a788efb7ed2f469e294ad1c567ab9f8fe4af2d90491c1df24872970e27a9f",
+         intel: "b4ab4592a588d852fb2cadf92d44dc192d5608b131c74b32fc35aaaca339ac90"
 
   url "https://github.com/copper-browser/Copper/releases/download/v#{version}/copper-#{version}-macos-#{arch}.zip"
   name "Copper"
@@ -34,13 +34,8 @@ cask "copper" do
   # It is rendered only when the built bundle actually ships the shim.
   binary "#{appdir}/Copper.app/Contents/Resources/bin/copper"
 
-  # Why: the bundle is ad-hoc signed (no Apple Developer ID, no notarization),
-  # so Gatekeeper refuses to launch it until the download quarantine flag is
-  # cleared. `postflight_steps` (Homebrew ≥ 7.0.6) rather than the
-  # deprecated `postflight` block; `brew install` updates Homebrew first.
-  postflight_steps do
-    run "/usr/bin/xattr", args: ["-cr", "{{appdir}}/Copper.app"]
-  end
+  # Nothing clears the quarantine flag: releases are signed with Copper's
+  # Developer ID and notarized, so Gatekeeper opens the app as downloaded.
 
   # Why: Copper keeps its tab session and settings under its own Application
   # Support dir; WebKit keeps site data under the bundle id. Nothing here is
