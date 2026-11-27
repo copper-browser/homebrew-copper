@@ -52,16 +52,16 @@ and move `Copper.app` to `/Applications`.
 
 ## How the cask stays current
 
-Releases are cut in the Copper repo, not here:
-`gh workflow run release.yml -R copper-browser/Copper -f ref=fork` builds on a GitHub-hosted Mac
-and publishes a `v<version>` GitHub release with the zip, its `.sha256`, `copper-version.json`
-and the installer.
-
-[`bump.yml`](.github/workflows/bump.yml) (hourly, or `gh workflow run bump.yml -R
-copper-browser/homebrew-copper`) reads the newest release's `copper-version.json`, checks it
-against the release's `.sha256` sidecar, re-renders `Casks/copper.rb` with
-[`scripts/render-cask.mjs`](scripts/render-cask.mjs) and pushes it to `main`. No secrets — the
-releases are public and the push uses the workflow's own `GITHUB_TOKEN`. The cask pins the
+Releases are cut in the Copper repo, not here: its Roadrunner pipeline
+(`.woodpecker/release.yaml` in copper-browser/Copper, docs/releasing.md there) builds, signs,
+notarizes and publishes a `v<version>` GitHub release with the zips, disk images, their
+`.sha256`, `copper-version.json` and the installer, and then bumps this tap itself:
+`release/bump-tap.sh` there runs this repo's [`scripts/bump.mjs`](scripts/bump.mjs) on that
+release's `copper-version.json` (checked against each zip's `.sha256` sidecar), and commits the
+re-rendered `Casks/copper.rb` to `main` through GitHub's contents API as `exowatt-woodpecker-bot`.
+It never moves the cask to an older version. By hand: `release/bump-tap.sh [<version>]` in a
+Copper checkout, or a manual Roadrunner run of [`.woodpecker/bump.yaml`](.woodpecker/bump.yaml)
+here (`ci/bump.sh`, the latest release). The cask pins the
 versioned asset (`releases/download/v<version>/copper-<version>-macos-<arch>.zip`, `arm64` or
 `x86_64` through the cask's `arch` stanza), never
 `latest`, so its sha256 always matches.
@@ -72,7 +72,7 @@ versioned asset (`releases/download/v<version>/copper-<version>-macos-<arch>.zip
 | `scripts/render-cask.mjs` | Renders the cask from `--version --sha256 --commit [--cli]`. |
 | `scripts/bump.mjs` | Fetches the latest `copper-version.json`, verifies, renders, writes. |
 | `scripts/render-cask.test.mjs` | `node --test` coverage for both. |
-| `.github/workflows/bump.yml` | Hourly/on-demand cask bump. |
+| `.woodpecker/bump.yaml` | On-demand cask bump on Roadrunner (manual run; the release pipeline bumps by itself). |
 | `.github/workflows/check.yml` | Tests + `brew readall` of the cask on macOS. |
 
 ## Troubleshooting
@@ -82,6 +82,6 @@ versioned asset (`releases/download/v<version>/copper-<version>-macos-<arch>.zip
 - **`It seems there is already an App at '/Applications/Copper.app'`** — quit Copper, then
   `brew install --cask --force copper-browser/copper/copper` once.
 - **`SHA256 mismatch`** — the tap is stale. `brew update` and retry.
-- **`brew upgrade --cask copper` says nothing to do but a newer release exists** — the hourly bump
-  hasn't run yet; `gh workflow run bump.yml -R copper-browser/homebrew-copper`, or just let Copper
-  update itself.
+- **`brew upgrade --cask copper` says nothing to do but a newer release exists** — the release's
+  tap step didn't run or failed; `release/bump-tap.sh` in a Copper checkout (or a manual run of
+  `.woodpecker/bump.yaml`), or just let Copper update itself.
